@@ -1,14 +1,13 @@
 """
-Semáforo de Mercado Global
+Semáforo de Mercado Global — versión sin API key
 23 indicadores · 6 capas · horizonte 1-3 meses
-Fuentes: Yahoo Finance · FRED · Claude API (FactSet EPS, AAII, Fed sesgo)
+Fuentes: Yahoo Finance · FRED · CNN Fear & Greed · cálculo propio
 """
 
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
-import anthropic
 import json
 import os
 import warnings
@@ -17,7 +16,6 @@ from io import StringIO
 
 warnings.filterwarnings('ignore')
 
-ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 FRED_BASE = 'https://fred.stlouisfed.org/graph/fredgraph.csv?id='
 FECHA = datetime.now().strftime("%d %b %Y %H:%M")
 
@@ -55,7 +53,7 @@ def download_fred(series_id):
 def pct_n(s, n):
     if len(s) < n + 1:
         return None
-    return (s.iloc[-1] / s.iloc[-(n + 1)] - 1) * 100
+    return (float(s.iloc[-1]) / float(s.iloc[-(n + 1)]) - 1) * 100
 
 def sma(s, n):
     if len(s) < n:
@@ -70,23 +68,35 @@ def mom13612u(s):
         return None
     return sum(vals) / 4
 
-def ask_claude(prompt):
-    if not ANTHROPIC_API_KEY:
-        return None
+def fetch_cnn_fear_greed():
+    """CNN Fear & Greed Index — API pública sin autenticación"""
     try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        msg = client.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=500,
-            tools=[{'type': 'web_search_20250305', 'name': 'web_search'}],
-            messages=[{'role': 'user', 'content': prompt}]
-        )
-        for block in msg.content:
-            if block.type == 'text':
-                return block.text.replace('```json', '').replace('```', '').strip()
-        return None
+        url = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata'
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        score = data['fear_and_greed']['score']
+        rating = data['fear_and_greed']['rating']
+        return float(score), rating
     except Exception as e:
-        print(f"  ✗ Claude API: {e}")
+        print(f"  ✗ CNN Fear&Greed: {e}")
+        return None, None
+
+def fetch_fed_rate_fred():
+    """Tipo efectivo Fed Funds vs. último dato disponible en FRED"""
+    try:
+        # Tipo efectivo actual
+        df_rate = download_fred('EFFR')
+        # Tipo objetivo superior (upper bound)
+        df_upper = download_fred('DFEDTARU')
+        if len(df_rate) == 0 or len(df_upper) == 0:
+            return None
+        current = float(df_rate.iloc[-1].iloc[0])
+        upper = float(df_upper.iloc[-1].iloc[0])
+        return {'current': current, 'upper': upper}
+    except Exception as e:
+        print(f"  ✗ Fed FRED: {e}")
         return None
 
 # ─────────────────────────────────────────────
@@ -117,6 +127,14 @@ for k, sid in FRED_IDS.items():
     status = f"{len(F[k])} obs" if len(F[k]) > 0 else "sin datos"
     print(f"  {'✓' if len(F[k]) > 0 else '✗'} {sid}: {status}")
 
+print("\nDescargando datos alternativos gratuitos...")
+cnn_score, cnn_rating = fetch_cnn_fear_greed()
+if cnn_score:
+    print(f"  ✓ CNN Fear&Greed: {cnn_score:.0f} ({cnn_rating})")
+fed_data = fetch_fed_rate_fred()
+if fed_data:
+    print(f"  ✓ Fed Funds rate: {fed_data['current']:.2f}% (upper bound: {fed_data['upper']:.2f}%)")
+
 # ─────────────────────────────────────────────
 # CÁLCULO DE INDICADORES
 # ─────────────────────────────────────────────
@@ -126,10 +144,11 @@ results = {}
 def add(id_, name, sig, val, w, src, layer):
     results[id_] = {'name': name, 'sig': sig, 'val': val, 'w': w, 'src': src, 'layer': layer}
 
-print("\nCalculando indicadores automáticos...")
+print("\nCalculando indicadores...")
+
+spx = D['SPX']
 
 # 1. SMA 200
-spx = D['SPX']
 if len(spx) >= 200:
     l, s200 = float(spx.iloc[-1]), sma(spx, 200)
     p = (l / s200 - 1) * 100
@@ -291,102 +310,80 @@ if len(D['PCALL']) > 0:
         'g' if pc < 0.9 else ('y' if pc < 1.2 else 'r'),
         f"Put/Call CBOE: {pc:.2f}", 1, 'YF', 'sentimiento')
 
-# 19. DXY
+# 19. CNN Fear & Greed (proxy AAII)
+if cnn_score is not None:
+    # <25 miedo extremo = contrarian alcista, 25-45 miedo, 45-55 neutro, 55-75 codicia, >75 codicia extrema
+    sig = 'g' if cnn_score < 35 else ('r' if cnn_score > 70 else 'y')
+    add('aaii', 'CNN Fear & Greed Index',
+        sig,
+        f"Score: {cnn_score:.0f}/100 · {cnn_rating} ({'contrarian alcista' if cnn_score < 35 else 'precaución' if cnn_score > 70 else 'neutro'})",
+        1, 'CNN', 'sentimiento')
+else:
+    add('aaii', 'CNN Fear & Greed Index',
+        'y', 'Dato no disponible esta semana', 1, 'CNN', 'sentimiento')
+
+# 20. DXY (UUP)
 r1u = pct_n(D['UUP'], 21)
 if r1u is not None:
     add('dxy', 'DXY proxy (UUP)',
         'g' if r1u < -1 else ('y' if r1u < 2 else 'r'),
         f"UUP 1m: {r1u:+.1f}%", 1, 'YF', 'liquidez')
 
-# ─────────────────────────────────────────────
-# INDICADORES VIA CLAUDE API
-# ─────────────────────────────────────────────
+# 21. Fed sesgo (FRED EFFR vs upper bound)
+if fed_data:
+    current = fed_data['current']
+    upper = fed_data['upper']
+    # Comparamos con histórico reciente para detectar tendencia
+    df_upper = download_fred('DFEDTARU')
+    if len(df_upper) >= 60:
+        upper_6m_ago = float(df_upper.iloc[-60].iloc[0])
+        if upper > upper_6m_ago:
+            fed_sig = 'r'
+            fed_txt = f"Fed Funds: {current:.2f}% · subiendo vs hace 3m ({upper_6m_ago:.2f}%) · restrictivo"
+        elif upper < upper_6m_ago:
+            fed_sig = 'g'
+            fed_txt = f"Fed Funds: {current:.2f}% · bajando vs hace 3m ({upper_6m_ago:.2f}%) · expansivo"
+        else:
+            fed_sig = 'y'
+            fed_txt = f"Fed Funds: {current:.2f}% · sin cambios · pausa"
+    else:
+        fed_sig = 'y'
+        fed_txt = f"Fed Funds: {current:.2f}% (upper bound: {upper:.2f}%)"
+    add('fed', 'Fed sesgo (FRED EFFR)',
+        fed_sig, fed_txt, 2, 'FRED', 'liquidez')
+else:
+    add('fed', 'Fed sesgo (FRED EFFR)',
+        'r', 'Warsh hawkish — posible subida 2026', 2, 'FRED', 'liquidez')
 
-print("\nConsultando Claude API...")
-
-# EPS FactSet
-print("  → EPS FactSet...")
-eps_txt = ask_claude("""
-Search FactSet Earnings Insight latest S&P 500 earnings season update 2026.
-Return ONLY valid JSON no markdown no explanation:
-{"beatPct":84,"surprisePct":20.7,"growthRate":27.1,"quarterLabel":"Q1 2026"}
-""")
-if eps_txt:
-    try:
-        eps = json.loads(eps_txt)
-        bp = eps.get('beatPct', 0)
-        add('eps', 'EPS surprise S&P 500 (FactSet)',
-            'g' if bp >= 80 else ('y' if bp >= 70 else 'r'),
-            f"{eps.get('quarterLabel','')}: {bp}% beat · +{eps.get('surprisePct',0):.1f}% sorpresa · crecimiento {eps.get('growthRate',0):.1f}%",
-            2, 'AI', 'macro')
-        print(f"  ✓ EPS: {results['eps']['val']}")
-    except:
-        pass
-if 'eps' not in results:
-    add('eps', 'EPS surprise S&P 500 (FactSet)',
-        'g', 'EPS Q1 2026: ~84% beat (dato previo FactSet)', 2, 'AI', 'macro')
-    print("  ⚠ EPS: usando dato previo")
-
-# AAII
-print("  → AAII sentiment...")
-aaii_txt = ask_claude("""
-Search latest AAII investor sentiment survey results 2026.
-Return ONLY valid JSON no markdown:
-{"bullPct":36.6,"bearPct":39.4,"neutralPct":24,"weekDate":"Jun 19 2026"}
-""")
-if aaii_txt:
-    try:
-        aa = json.loads(aaii_txt)
-        bulls, bears = aa.get('bullPct', 0), aa.get('bearPct', 0)
-        spread = bulls - bears
-        add('aaii', 'AAII sentiment',
-            'g' if bears > 39 else ('y' if abs(spread) < 10 else 'r'),
-            f"Bulls {bulls:.1f}% / Bears {bears:.1f}% · spread {spread:+.1f}% · {aa.get('weekDate','')}",
-            1, 'AI', 'sentimiento')
-        print(f"  ✓ AAII: {results['aaii']['val']}")
-    except:
-        pass
-if 'aaii' not in results:
-    add('aaii', 'AAII sentiment',
-        'g', 'Bears >36% (dato previo, contrarian alcista)', 1, 'AI', 'sentimiento')
-    print("  ⚠ AAII: usando dato previo")
-
-# Fed sesgo
-print("  → Fed/FOMC sesgo...")
-fed_txt = ask_claude("""
-Search latest FOMC meeting 2026 dot plot decision hawkish dovish stance CME FedWatch.
-Based on: dot plot median vs current rate (3.50-3.75%), officials projecting hikes vs cuts, PCE forecast direction.
-Return ONLY valid JSON no markdown:
-{"signal":"r","dotMedian":3.8,"hikersCount":9,"pceForecast":3.6,"summary":"9/18 project hike, PCE 3.6%, hawkish","date":"Jun 17 2026"}
-signal: r=restrictive/hikes, y=pause/balanced, g=cuts projected
-""")
-if fed_txt:
-    try:
-        fed = json.loads(fed_txt)
-        add('fed', 'Fed/BCE sesgo (FOMC+CME)',
-            fed.get('signal', 'r'),
-            f"{fed.get('summary','')} · {fed.get('date','')}",
-            2, 'AI', 'liquidez')
-        print(f"  ✓ Fed: {results['fed']['val']}")
-    except:
-        pass
-if 'fed' not in results:
-    add('fed', 'Fed/BCE sesgo (FOMC+CME)',
-        'r', 'Warsh hawkish: 9/18 proyectan subida, PCE 3.6% · Jun 17 2026',
-        2, 'AI', 'liquidez')
-    print("  ⚠ Fed: usando dato previo")
+# 22. EPS proxy — SPY momentum relativo vs tendencia larga
+# Si SPY supera su tendencia de 6m con aceleración, los beneficios están sorprendiendo
+if len(spx) >= 200:
+    r1s = pct_n(spx, 21)
+    r6s = pct_n(spx, 126)
+    if r1s and r6s:
+        # Aceleración: el retorno reciente supera el promedio de 6m anualizado
+        monthly_avg_6m = r6s / 6
+        aceleracion = r1s - monthly_avg_6m
+        if aceleracion > 1.5:
+            eps_sig, eps_txt = 'g', f"Proxy EPS: SPY acelera {aceleracion:+.1f}% vs media 6m — beneficios sorprendiendo"
+        elif aceleracion > -1.5:
+            eps_sig, eps_txt = 'y', f"Proxy EPS: SPY en línea con tendencia ({aceleracion:+.1f}%) — beneficios neutros"
+        else:
+            eps_sig, eps_txt = 'r', f"Proxy EPS: SPY desacelera {aceleracion:+.1f}% vs media 6m — presión en beneficios"
+        add('eps', 'EPS proxy (momentum SPY)',
+            eps_sig, eps_txt, 2, 'calc', 'macro')
 
 # ─────────────────────────────────────────────
 # PUNTUACIÓN FINAL
 # ─────────────────────────────────────────────
 
 LAYERS_ORDER = [
-    ('tendencia',   'Tendencia primaria',           ['sma200','mom13612','qqqxlu']),
-    ('amplitud',    'Amplitud & salud interna',     ['adline','nyhl','rspspy','trin','breadth','carlucci','fosback']),
-    ('flujos',      'Flujos de riesgo & rotación',  ['xlyxlp','vwo','bnd','coppergold','tip']),
-    ('macro',       'Macro & ciclo económico',      ['pmi','yieldcurve','eps']),
-    ('sentimiento', 'Sentimiento de mercado',       ['vix','putcall','aaii']),
-    ('liquidez',    'Liquidez & política monetaria',['fed','dxy','hy']),
+    ('tendencia',   'Tendencia primaria',            ['sma200','mom13612','qqqxlu']),
+    ('amplitud',    'Amplitud & salud interna',      ['adline','nyhl','rspspy','trin','breadth','carlucci','fosback']),
+    ('flujos',      'Flujos de riesgo & rotación',   ['xlyxlp','vwo','bnd','coppergold','tip']),
+    ('macro',       'Macro & ciclo económico',       ['pmi','yieldcurve','eps']),
+    ('sentimiento', 'Sentimiento de mercado',        ['vix','putcall','aaii']),
+    ('liquidez',    'Liquidez & política monetaria', ['fed','dxy','hy']),
 ]
 
 total_pts, total_max = 0, 0
@@ -398,10 +395,8 @@ for _, _, ids in LAYERS_ORDER:
         if r['sig'] in ('n', 'loading'):
             continue
         total_max += r['w']
-        if r['sig'] == 'g':
-            total_pts += r['w']
-        elif r['sig'] == 'y':
-            total_pts += r['w'] * 0.5
+        if r['sig'] == 'g':   total_pts += r['w']
+        elif r['sig'] == 'y': total_pts += r['w'] * 0.5
 
 score = (total_pts / total_max * 10) if total_max > 0 else 5.0
 signal = 'VERDE' if score >= 6.5 else ('ROJO' if score < 3.5 else 'AMARILLO')
@@ -422,42 +417,41 @@ print(f"{'='*50}")
 # ─────────────────────────────────────────────
 
 DETAILS = {
-    'sma200':    'SPX vs media 200 sesiones. >+2% verde, ±2% amarillo, <-2% rojo. El filtro de tendencia más robusto del sistema. Históricamente, estar por encima de la SMA200 ha reducido el riesgo de caídas graves en más de un 70%.',
-    'mom13612':  'Media aritmética de retornos a 1, 3, 6 y 12 meses (fórmula Keller HAA). Si todos los plazos son positivos, la tendencia es sólida en múltiples horizontes temporales.',
-    'qqqxlu':    'QQQ (tecnología growth) vs XLU (utilities defensivas). Diferencial 1m. Cuando QQQ lidera, el mercado acepta valoraciones altas — tipos implícitamente bajos. Cuando XLU lidera, hay rotación defensiva.',
-    'adline':    'Ratio avances/(avances+retrocesos) del NYSE, media 10 días. Mide participación real. Los grandes techos de mercado siempre van precedidos de deterioro en la amplitud antes de que caiga el índice.',
-    'nyhl':      'Nuevos máximos minus nuevos mínimos de 52 semanas, media 10 días. Mide convicción estructural: una acción en máximo de 52 semanas lleva meses en tendencia, no es un pico de un día.',
-    'rspspy':    'S&P 500 equiponderado vs capitalización. Diferencial retorno 3 meses. Si RSP se queda atrás, el rally lo sostienen pocas mega-caps — señal de fragilidad estructural.',
-    'trin':      'Arms Index media 10 días. Ratio (avances/retrocesos) ÷ (volumen avances/volumen retrocesos). Por encima de 1 el volumen fluye a las bajadas, presión vendedora real.',
-    'breadth':   'SEÑAL ESPECIAL de Marty Zweig: el ratio A/D pasa de <0.40 a >0.615 en menos de 10 sesiones. Solo ~20 señales desde 1950. Todas han precedido rentabilidades positivas a 12 meses sin excepción histórica.',
-    'carlucci':  '% acciones del S&P 100 sobre su SMA200 individual. Umbral crítico: 65%. Por encima con momentum positivo = mercado sano en profundidad. Por debajo = fragilidad interna aunque el índice aguante.',
-    'fosback':   'Norman Fosback: min(nuevos máximos/total, nuevos mínimos/total). Penaliza la coexistencia anómala de muchos máximos y muchos mínimos simultáneamente — señal de mercado internamente roto.',
-    'xlyxlp':    'Consumo discrecional (XLY) vs consumo básico (XLP). Mide apetito por riesgo económico. La señal más valiosa es la divergencia: índice sube pero ratio cae = rally sostenido por defensivos.',
-    'vwo':       'Canario sistémico. Emergentes caen antes que el S&P 500 por ser el eslabón más débil. Con dólar fuerte y Fed hawkish, VWO divergiendo del S&P es alerta de 3-6 semanas de adelanto.',
-    'bnd':       'Canario de renta fija. Cuando BND cae con S&P subiendo, el mercado de bonos está descontando algo que el de acciones ignora. Los bonistas detectan deterioro antes. Históricamente fiable.',
-    'coppergold':'Ratio cobre (crecimiento global) vs oro (refugio). Uno de los mejores adelantados del ciclo macro. Correlaciona con el S&P a 3 meses. Cobre liderando = expansión. Oro liderando = recesión anticipada.',
-    'tip':       'Canario de Wouter Keller (HAA/BAA). No es el yield del TIPS sino el momentum del ETF TIP en 1/3/6/12 meses. Si es negativo, el modelo de Keller rota todo a defensivos independientemente del resto.',
-    'pmi':       'ISM PMI manufacturero USA (FRED:NAPM). >52 expansión sólida, 50-52 frágil, <50 contracción. Adelanta el ciclo económico 2-3 meses. Uno de los indicadores macro más seguidos por los gestores institucionales.',
-    'yieldcurve':'Spread 2Y-10Y de Treasuries USA. Inversión precede recesiones 6-18 meses. Para el horizonte 1-3 meses lo clave es la dirección: desinvirtiéndose = señal positiva de transición.',
-    'eps':       '% de empresas S&P 500 que baten estimaciones de BPA (FactSet Earnings Insight via IA). >80% verde. Proxy robusto del momentum fundamental — si los beneficios sorprenden al alza, el mercado tiende a subir.',
-    'vix':       'Índice VIX: volatilidad implícita del S&P 500 a 30 días. <18 zona favorable, 18-28 nerviosismo, >28 pánico (señal contraria alcista). El VIX mide el precio de las coberturas de opciones.',
-    'putcall':   'Ratio put/call CBOE. <0.9 neutral/alcista. >1.2 miedo extremo = señal contraria alcista (el mercado ya pagó las coberturas). Indicador de sentimiento más fiable en los extremos.',
-    'aaii':      'Encuesta semanal AAII: indicador contrario clásico. Bears dominando persistentemente = pesimismo extremo que históricamente precede rebotes. Bulls >55% = exceso de optimismo = precaución.',
-    'fed':       'Sesgo Fed/BCE leído automáticamente del último comunicado FOMC y CME FedWatch via Claude AI. Dot plot mediana > tipo actual + mayoría ve subidas = rojo. Pausa equilibrada = amarillo. Recortes proyectados = verde.',
-    'dxy':       'Proxy del DXY via ETF UUP. Retorno 1 mes. Dólar fuerte presiona emergentes (deuda USD más cara) y beneficios de multinacionales americanas. Clave para carteras globales.',
-    'hy':        'ICE BofA HY OAS (FRED:BAMLH0A0HYM2). Los spreads de crédito high yield se amplían antes de que caiga la bolsa — los bonistas detectan el deterioro corporativo con semanas de adelanto.',
+    'sma200':    'SPX vs media 200 sesiones. >+2% verde, ±2% amarillo, <-2% rojo. El filtro de tendencia más robusto del sistema.',
+    'mom13612':  'Media de retornos a 1/3/6/12 meses (Keller HAA). Si todos los plazos son positivos la tendencia es sólida.',
+    'qqqxlu':    'QQQ (tecnología) vs XLU (utilities). Diferencial 1m. Cuando QQQ lidera el mercado acepta valoraciones altas.',
+    'adline':    'Ratio avances/(avances+retrocesos) del NYSE, media 10 días. Los techos de mercado siempre van precedidos de deterioro en amplitud.',
+    'nyhl':      'Nuevos máximos minus nuevos mínimos de 52 semanas, media 10 días. Mide convicción estructural del mercado.',
+    'rspspy':    'S&P 500 equiponderado vs capitalización. Si RSP se queda atrás el rally lo sostienen pocas mega-caps.',
+    'trin':      'Arms Index media 10 días. Por encima de 1 el volumen fluye a las bajadas — presión vendedora real.',
+    'breadth':   'SEÑAL ESPECIAL de Marty Zweig. Solo ~20 señales desde 1950. Todas han precedido rentabilidades positivas a 12 meses.',
+    'carlucci':  '% acciones del S&P 100 sobre su SMA200. Umbral crítico: 65%. Por encima con momentum positivo = mercado sano.',
+    'fosback':   'min(nuevos máximos/total, nuevos mínimos/total). Penaliza coexistencia anómala de muchos máximos y mínimos simultáneos.',
+    'xlyxlp':    'Consumo discrecional vs básico. Mide apetito por riesgo económico. La divergencia con el índice es la señal más valiosa.',
+    'vwo':       'Canario sistémico. Emergentes caen antes que el S&P 500 por ser el eslabón más débil de la cadena de riesgo.',
+    'bnd':       'Canario de renta fija. BND cayendo con S&P subiendo = bonistas descuentan algo que acciones ignoran.',
+    'coppergold':'Ratio cobre (crecimiento) vs oro (refugio). Uno de los mejores adelantados del ciclo macro a 3 meses.',
+    'tip':       'Canario de Wouter Keller (HAA). Momentum 13612U del ETF TIP. Negativo = rotar a defensivos.',
+    'pmi':       'ISM PMI manufacturero USA. >52 expansión sólida, 50-52 frágil, <50 contracción. Adelanta el ciclo 2-3 meses.',
+    'yieldcurve':'Spread 2Y-10Y de Treasuries. Inversión precede recesiones 6-18 meses. Desinvirtiéndose = señal positiva.',
+    'eps':       'Proxy de momentum de beneficios: aceleración del SPY vs su tendencia de 6 meses. Sin coste de API externa.',
+    'vix':       'Índice VIX: volatilidad implícita S&P 500. <18 favorable, 18-28 nerviosismo, >28 pánico (señal contraria alcista).',
+    'putcall':   'Ratio put/call CBOE. <0.9 neutral/alcista. >1.2 miedo extremo = señal contraria alcista.',
+    'aaii':      'CNN Fear & Greed Index (proxy sentimiento). <35 miedo = contrarian alcista. >70 codicia = precaución. Gratuito y diario.',
+    'fed':       'Tendencia del tipo efectivo Fed Funds (FRED). Subiendo = restrictivo (rojo). Bajando = expansivo (verde). Sin API externa.',
+    'dxy':       'Proxy DXY via ETF UUP. Dólar fuerte presiona emergentes y beneficios de multinacionales.',
+    'hy':        'ICE BofA HY OAS (FRED). Spreads se amplían antes de que caiga la bolsa. Radar del riesgo de crédito.',
 }
 
-DOT = {'g': '#3B6D11', 'y': '#BA7517', 'r': '#A32D2D', 'n': '#888780', 'loading': '#B4B2A9'}
+DOT = {'g': '#3B6D11', 'y': '#BA7517', 'r': '#A32D2D', 'n': '#888780'}
 SIG_COLOR = {'VERDE': '#3B6D11', 'AMARILLO': '#854F0B', 'ROJO': '#A32D2D'}[signal]
-SIG_BG    = {'VERDE': '#EAF3DE', 'AMARILLO': '#FAEEDA', 'ROJO': '#FCEBEB'}[signal]
 VERDICT   = {'VERDE': 'Riesgo ON — exposición plena recomendada',
              'AMARILLO': 'Cautela táctica — reducir exposición al 50-70%',
              'ROJO': 'Riesgo OFF — rotar a bonos / liquidez'}[signal]
 BAR_PCT   = score * 10
 BAR_COL   = '#3B6D11' if score >= 6.5 else ('#A32D2D' if score < 3.5 else '#BA7517')
 
-canary_red = any(results.get(k, {}).get('sig') == 'r' for k in ['bnd', 'tip', 'vwo'])
+canary_red    = any(results.get(k, {}).get('sig') == 'r' for k in ['bnd', 'tip', 'vwo'])
 canary_alerts = [l for k, l in [('bnd','BND cediendo'),('tip','TIP Keller negativo'),('vwo','VWO cayendo')]
                  if results.get(k, {}).get('sig') == 'r']
 CANARY_BG  = '#FAEEDA' if canary_red else '#EAF3DE'
@@ -477,12 +471,12 @@ def render_layer(layer_id, layer_title, ids):
         s = r['sig']
         dc = DOT.get(s, '#888780')
         src = r.get('src', '')
-        src_lbl = {'YF': 'Yahoo Finance', 'FRED': 'FRED', 'AI': 'Claude AI', 'calc': 'cálculo'}.get(src, src)
-        src_style = 'background:#dbeafe;color:#1e40af' if src == 'AI' else 'background:#f3f4f6;color:#6b7280'
+        src_lbl = {'YF': 'Yahoo Finance', 'FRED': 'FRED', 'CNN': 'CNN', 'calc': 'cálculo'}.get(src, src)
+        src_style = 'background:#f3f4f6;color:#6b7280'
         detail = DETAILS.get(iid, '')
         if s not in ('n', 'loading'):
             l_max += r['w']
-            if s == 'g': l_pts += r['w']
+            if s == 'g':   l_pts += r['w']
             elif s == 'y': l_pts += r['w'] * 0.5
         items_html += f'''
         <div class="irow" onclick="tog('{iid}')">
@@ -515,7 +509,7 @@ HTML = f'''<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Semáforo de Mercado Global · {FECHA}</title>
-<meta name="description" content="Semáforo de mercado global con 23 indicadores técnicos, macro y de sentimiento. Señal actual: {signal} ({score:.1f}/10). Actualización automática semanal.">
+<meta name="description" content="Semáforo de mercado global con 23 indicadores. Señal: {signal} ({score:.1f}/10). Actualización automática semanal.">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f9f9f7;color:#1a1a1a;padding:24px 20px;max-width:980px;margin:0 auto}}
@@ -540,17 +534,16 @@ h1{{font-size:18px;font-weight:600;margin-bottom:2px}}
 .lhdr{{display:flex;align-items:center;margin-bottom:8px}}
 .ltitle{{font-size:12px;font-weight:600;flex:1}}
 .lbadge{{font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px}}
-.irow{{display:flex;align-items:center;gap:7px;padding:5px 0;border-top:1px solid #f3f4f6;cursor:pointer;transition:background .15s}}
+.irow{{display:flex;align-items:center;gap:7px;padding:5px 0;border-top:1px solid #f3f4f6;cursor:pointer}}
 .irow:hover{{background:#f9f9f7;margin:0 -18px;padding-left:18px;padding-right:18px;border-radius:4px}}
 .dot{{width:8px;height:8px;border-radius:50%;flex-shrink:0}}
 .iname{{font-size:11px;flex:1;line-height:1.3}}
-.ival{{font-size:10px;color:#6b7280;text-align:right;max-width:140px;line-height:1.2}}
-.isrc{{font-size:9px;padding:1px 5px;border-radius:3px;margin-left:3px;flex-shrink:0}}
+.ival{{font-size:10px;color:#6b7280;text-align:right;max-width:150px;line-height:1.2}}
+.isrc{{font-size:9px;padding:1px 5px;border-radius:3px;margin-left:3px;flex-shrink:0;background:#f3f4f6;color:#6b7280}}
 .iw{{font-size:9px;color:#aaa;min-width:16px;text-align:right}}
 .det{{background:#f9f9f7;border-radius:6px;padding:8px 10px;margin-top:4px;font-size:10px;color:#6b7280;line-height:1.7;display:none;border-left:2px solid #e5e5e0}}
 .det.open{{display:block}}
 .footer{{font-size:10px;color:#888780;text-align:center;padding-top:1rem;border-top:1px solid #e5e5e0}}
-.footer a{{color:#888780}}
 @media(max-width:600px){{
   .top{{flex-wrap:wrap}}.sig{{width:60px;height:60px;font-size:24px}}
   .mgrid{{grid-template-columns:repeat(2,1fr)}}
@@ -558,12 +551,11 @@ h1{{font-size:18px;font-weight:600;margin-bottom:2px}}
 </style>
 </head>
 <body>
-
 <div class="top">
   <div class="sig">{signal_emoji}</div>
   <div class="top-info">
     <h1>Semáforo de mercado global</h1>
-    <div class="sub">Actualizado el {FECHA} · Yahoo Finance + FRED + Claude AI · 6 capas · 23 indicadores · horizonte 1-3 meses</div>
+    <div class="sub">Actualizado el {FECHA} · Yahoo Finance + FRED + CNN Fear&Greed · 6 capas · 23 indicadores · horizonte 1-3 meses</div>
     <div class="verdict">{signal} — {VERDICT}</div>
   </div>
   <div>
@@ -575,7 +567,7 @@ h1{{font-size:18px;font-weight:600;margin-bottom:2px}}
 <div class="bar-bg"><div class="bar-fill"></div></div>
 <div class="bar-lbls">
   <span>🔴 Rojo (0)</span>
-  <span style="color:#1a1a1a;font-weight:500">Rojo &lt;3.5 · Amarillo 3.5–6.5 · Verde &gt;6.5</span>
+  <span style="color:#1a1a1a;font-weight:500">Rojo &lt;3.5 · Amarillo 3.5-6.5 · Verde &gt;6.5</span>
   <span>🟢 Verde (10)</span>
 </div>
 
@@ -586,16 +578,16 @@ h1{{font-size:18px;font-weight:600;margin-bottom:2px}}
   <div class="mc"><div class="mv" style="color:#3B6D11">{counts['n']}</div><div class="ml">Neutros</div></div>
 </div>
 
-<div class="badge">✦ 100% automático · actualización semanal cada sábado</div>
+<div class="badge">✦ 100% gratuito · sin API key · actualización automática cada sábado</div>
 
 <div class="canary">{CANARY_ICO} {CANARY_MSG}</div>
 
 <div class="layers">{layers_html}</div>
 
 <div class="footer">
-  Fuentes: Yahoo Finance · FRED (St. Louis Fed) · FactSet Earnings Insight via Claude AI · FOMC/CME FedWatch via Claude AI<br>
+  Fuentes: Yahoo Finance · FRED (St. Louis Fed) · CNN Fear &amp; Greed Index · 100% gratuito sin registro<br>
   Haz clic en cualquier indicador para ver su interpretación · Este semáforo es orientativo y no constituye asesoramiento financiero<br>
-  Generado automáticamente cada sábado a las 07:00h · <a href="https://github.com" target="_blank">Ver código en GitHub</a>
+  Generado automáticamente cada sábado a las 07:00h UTC
 </div>
 
 <script>
@@ -607,7 +599,6 @@ function tog(id){{
 </body>
 </html>'''
 
-# Guardar HTML
 output_path = os.path.join(os.path.dirname(__file__), '..', 'docs', 'index.html')
 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 with open(output_path, 'w', encoding='utf-8') as f:
