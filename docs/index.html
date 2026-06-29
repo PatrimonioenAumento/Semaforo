@@ -3,21 +3,292 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Semáforo de Mercado Global</title>
+<title>Semáforo de Mercado Global · 29 Jun 2026 11:10</title>
 <style>
-body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f9f9f7;color:#1a1a1a;text-align:center;padding:24px}
-.box{max-width:400px}
-.emoji{font-size:64px;margin-bottom:16px}
-h1{font-size:22px;font-weight:600;margin-bottom:8px}
-p{font-size:14px;color:#6b7280;line-height:1.6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f9f9f7;color:#1a1a1a;padding:24px 20px;max-width:980px;margin:0 auto}
+.top{display:flex;align-items:center;gap:16px;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid #e5e5e0}
+.sig{width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;background:#854F0B}
+.top-info{flex:1}
+h1{font-size:18px;font-weight:600;margin-bottom:2px}
+.sub{font-size:11px;color:#888780;margin-bottom:5px}
+.verdict{font-size:13px;font-weight:500;color:#854F0B}
+.snum{font-size:28px;font-weight:600;color:#1a1a1a;line-height:1;text-align:right}
+.slbl{font-size:10px;color:#888780;text-align:right;margin-top:1px}
+.bar-bg{height:9px;background:#e5e5e0;border-radius:5px;overflow:hidden;margin-bottom:4px}
+.bar-fill{height:100%;border-radius:5px;width:62%;background:#BA7517}
+.bar-lbls{display:flex;justify-content:space-between;font-size:10px;color:#888780;margin-bottom:1rem}
+.mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem}
+.mc{background:#f3f4f6;border-radius:8px;padding:8px 10px;text-align:center}
+.mc .mv{font-size:18px;font-weight:500}.mc .ml{font-size:10px;color:#888780;margin-top:1px}
+.badge{background:#dcfce7;color:#166534;font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #86efac;margin-bottom:1rem;display:inline-flex;align-items:center;gap:5px}
+.canary{padding:8px 12px;border-radius:8px;margin-bottom:1rem;display:flex;align-items:center;gap:8px;font-size:11px;line-height:1.5;background:#EAF3DE;border:1px solid #97C459;color:#27500A}
+.layers{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;margin-bottom:1.5rem}
+.lcard{background:#fff;border:1px solid #e5e5e0;border-radius:12px;padding:14px 18px}
+.lhdr{display:flex;align-items:center;margin-bottom:8px}
+.ltitle{font-size:12px;font-weight:600;flex:1}
+.lbadge{font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px}
+.irow{display:flex;align-items:center;gap:7px;padding:5px 0;border-top:1px solid #f3f4f6;cursor:pointer}
+.irow:hover{background:#f9f9f7;margin:0 -18px;padding-left:18px;padding-right:18px;border-radius:4px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.iname{font-size:11px;flex:1;line-height:1.3}
+.ival{font-size:10px;color:#6b7280;text-align:right;max-width:150px;line-height:1.2}
+.isrc{font-size:9px;padding:1px 5px;border-radius:3px;margin-left:3px;flex-shrink:0;background:#f3f4f6;color:#6b7280}
+.iw{font-size:9px;color:#aaa;min-width:16px;text-align:right}
+.det{background:#f9f9f7;border-radius:6px;padding:8px 10px;margin-top:4px;font-size:10px;color:#6b7280;line-height:1.7;display:none;border-left:2px solid #e5e5e0}
+.det.open{display:block}
+.footer{font-size:10px;color:#888780;text-align:center;padding-top:1rem;border-top:1px solid #e5e5e0}
+@media(max-width:600px){
+  .top{flex-wrap:wrap}.mgrid{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 </head>
 <body>
-<div class="box">
-  <div class="emoji">🚦</div>
-  <h1>Semáforo de Mercado Global</h1>
-  <p>El dashboard se generará automáticamente el próximo sábado a las 07:00h.<br><br>
-  Para generar el primer informe ahora, ve a <strong>Actions → Actualizar Semáforo → Run workflow</strong> en GitHub.</p>
+<div class="top">
+  <div class="sig">🟡</div>
+  <div class="top-info">
+    <h1>Semáforo de mercado global</h1>
+    <div class="sub">Actualizado el 29 Jun 2026 11:10 · Yahoo Finance + FRED + Fear&Greed · 6 capas · 20 indicadores · horizonte 1-3 meses</div>
+    <div class="verdict">AMARILLO — Cautela táctica — reducir exposición al 50-70%</div>
+  </div>
+  <div>
+    <div class="snum">6.2</div>
+    <div class="slbl">/ 10</div>
+  </div>
 </div>
+
+<div class="bar-bg"><div class="bar-fill"></div></div>
+<div class="bar-lbls">
+  <span>🔴 Rojo (0)</span>
+  <span style="color:#1a1a1a;font-weight:500">Rojo &lt;3.5 · Amarillo 3.5-6.5 · Verde &gt;6.5</span>
+  <span>🟢 Verde (10)</span>
+</div>
+
+<div class="mgrid">
+  <div class="mc"><div class="mv" style="color:#3B6D11">9</div><div class="ml">Verdes</div></div>
+  <div class="mc"><div class="mv" style="color:#854F0B">4</div><div class="ml">Amarillos</div></div>
+  <div class="mc"><div class="mv" style="color:#A32D2D">6</div><div class="ml">Rojos</div></div>
+  <div class="mc"><div class="mv" style="color:#3B6D11">1</div><div class="ml">Neutros</div></div>
+</div>
+
+<div class="badge">✦ 100% gratuito · sin API key · actualización automática cada sábado</div>
+<div class="canary">✓ <strong>Canarios sin alerta:</strong> TIP, VWO y BND sin señales de estrés sistémico.</div>
+
+<div class="layers">
+  <div class="lcard">
+    <div class="lhdr">
+      <span class="ltitle">Tendencia primaria</span>
+      <span class="lbadge" style="background:#EAF3DE;color:#27500A">Verde</span>
+    </div>
+    
+        <div class="irow" onclick="tog('sma200')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">SMA 200 S&P 500</span>
+          <span class="ival">SPX 7354 vs SMA200 6925 (+6.2%)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×3</span>
+        </div>
+        <div class="det" id="det-sma200">SPX vs media 200 sesiones. >+2% verde, ±2% amarillo, <-2% rojo. El filtro de tendencia más robusto del sistema.</div>
+        <div class="irow" onclick="tog('mom13612')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">Momentum 13612U SPY</span>
+          <span class="ival">13612U: +9.62% (media 1/3/6/12m)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-mom13612">Media de retornos a 1/3/6/12 meses (Keller HAA). Si todos los plazos son positivos la tendencia es sólida.</div>
+        <div class="irow" onclick="tog('qqqxlu')">
+          <div class="dot" style="background:#A32D2D"></div>
+          <span class="iname">QQQ/XLU (tipos implícitos)</span>
+          <span class="ival">QQQ vs XLU 1m: -6.0%</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-qqqxlu">QQQ (tecnología) vs XLU (utilities). Diferencial 1m. Cuando QQQ lidera el mercado acepta valoraciones growth altas.</div>
+  </div>
+  <div class="lcard">
+    <div class="lhdr">
+      <span class="ltitle">Amplitud & salud interna</span>
+      <span class="lbadge" style="background:#EAF3DE;color:#27500A">Verde</span>
+    </div>
+    
+        <div class="irow" onclick="tog('adline')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">Amplitud sectorial (% ETFs > SMA50)</span>
+          <span class="ival">8/10 ETFs sobre SMA50 (80%)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-adline">% de ETFs sectoriales cotizando por encima de su SMA50. Proxy robusto de la amplitud de mercado.</div>
+        <div class="irow" onclick="tog('nyhl')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">IWM/SPY (small vs large caps)</span>
+          <span class="ival">IWM vs SPY 3m: +7.9% (small caps lideran)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-nyhl">IWM (small caps) vs SPY (large caps) retorno 3m. Cuando small caps lideran la amplitud es genuina y el mercado es sano.</div>
+        <div class="irow" onclick="tog('rspspy')">
+          <div class="dot" style="background:#A32D2D"></div>
+          <span class="iname">RSP/SPY (concentración mega-caps)</span>
+          <span class="ival">RSP vs SPY 3m: -3.0% (concentrado)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×1</span>
+        </div>
+        <div class="det" id="det-rspspy">S&P 500 equiponderado vs capitalización. Si RSP se queda atrás el rally lo sostienen pocas mega-caps — fragilidad.</div>
+        <div class="irow" onclick="tog('breadth')">
+          <div class="dot" style="background:#888780"></div>
+          <span class="iname">Breadth Thrust proxy</span>
+          <span class="ival">Sin señal (80% ETFs alcistas)</span>
+          <span class="isrc">cálculo</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-breadth">Proxy del Breadth Thrust de Zweig: % ETFs alcistas pasando de <40% a >61% rápidamente. Señal de convicción institucional.</div>
+        <div class="irow" onclick="tog('carlucci')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">Carlucci proxy (% ETFs > SMA200)</span>
+          <span class="ival">8/10 ETFs sobre SMA200 (80%, umbral 65%)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-carlucci">Proxy Carlucci: % ETFs sectoriales sobre su SMA200. Umbral 65%. Por encima = salud interna del mercado sólida.</div>
+        <div class="irow" onclick="tog('fosback')">
+          <div class="dot" style="background:#BA7517"></div>
+          <span class="iname">Fosback proxy (dispersión sectorial)</span>
+          <span class="ival">Dispersión retornos 1m: 4.8% (moderada)</span>
+          <span class="isrc">cálculo</span>
+          <span class="iw">×1</span>
+        </div>
+        <div class="det" id="det-fosback">Proxy Fosback: dispersión de retornos sectoriales 1m. Baja dispersión = mercado coherente. Alta = incoherencia interna.</div>
+  </div>
+  <div class="lcard">
+    <div class="lhdr">
+      <span class="ltitle">Flujos de riesgo & rotación</span>
+      <span class="lbadge" style="background:#EAF3DE;color:#27500A">Verde</span>
+    </div>
+    
+        <div class="irow" onclick="tog('xlyxlp')">
+          <div class="dot" style="background:#A32D2D"></div>
+          <span class="iname">XLY/XLP (ciclo vs defensivo)</span>
+          <span class="ival">XLY vs XLP 1m: -6.6%</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-xlyxlp">Consumo discrecional vs básico. Mide apetito por riesgo económico. Divergencia con el índice es señal de alerta.</div>
+        <div class="irow" onclick="tog('vwo')">
+          <div class="dot" style="background:#BA7517"></div>
+          <span class="iname">VWO canario emergentes</span>
+          <span class="ival">VWO 1m: -2.7% | 3m: +11.0%</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-vwo">Canario sistémico. Emergentes caen antes que el S&P 500 por ser el eslabón más débil de la cadena de riesgo global.</div>
+        <div class="irow" onclick="tog('bnd')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">BND canario renta fija</span>
+          <span class="ival">BND 1m: +0.9%</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-bnd">Canario de renta fija. BND cayendo con S&P subiendo = bonistas descuentan algo que acciones aún ignoran.</div>
+        <div class="irow" onclick="tog('coppergold')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">Copper/Gold ratio</span>
+          <span class="ival">CPER vs GLD 1m: +5.5%</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-coppergold">Ratio cobre (crecimiento) vs oro (refugio). Uno de los mejores adelantados del ciclo macro a 3 meses.</div>
+        <div class="irow" onclick="tog('tip')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">TIP momentum (Keller)</span>
+          <span class="ival">TIP 13612U: +1.79% (Keller HAA)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-tip">Canario de Wouter Keller (HAA). Momentum 13612U del ETF TIP. Negativo = rotar todo a defensivos.</div>
+  </div>
+  <div class="lcard">
+    <div class="lhdr">
+      <span class="ltitle">Macro & ciclo económico</span>
+      <span class="lbadge" style="background:#FCEBEB;color:#791F1F">Rojo</span>
+    </div>
+    
+        <div class="irow" onclick="tog('eps')">
+          <div class="dot" style="background:#A32D2D"></div>
+          <span class="iname">EPS proxy (momentum SPY)</span>
+          <span class="ival">Aceleración SPY: -3.3% vs media 6m (presión)</span>
+          <span class="isrc">cálculo</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-eps">Proxy de beneficios: aceleración del SPY vs su tendencia de 6 meses. Positiva = empresas sorprendiendo al alza.</div>
+  </div>
+  <div class="lcard">
+    <div class="lhdr">
+      <span class="ltitle">Sentimiento de mercado</span>
+      <span class="lbadge" style="background:#FAEEDA;color:#633806">Amarillo</span>
+    </div>
+    
+        <div class="irow" onclick="tog('vix')">
+          <div class="dot" style="background:#BA7517"></div>
+          <span class="iname">VIX (fear gauge)</span>
+          <span class="ival">VIX: 18.33</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-vix">Índice VIX: volatilidad implícita S&P 500. <18 favorable, 18-28 nerviosismo, >28 pánico (señal contraria alcista).</div>
+        <div class="irow" onclick="tog('putcall')">
+          <div class="dot" style="background:#BA7517"></div>
+          <span class="iname">VIX/VIX3M ratio (curva volatilidad)</span>
+          <span class="ival">VIX 18.3 / VIX3M 20.1 = 0.91 (normal)</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×1</span>
+        </div>
+        <div class="det" id="det-putcall">Ratio VIX/VIX3M: curva de volatilidad. Backwardation (>1.05) = estrés de corto plazo. Contango (<0.9) = mercado tranquilo.</div>
+        <div class="irow" onclick="tog('aaii')">
+          <div class="dot" style="background:#3B6D11"></div>
+          <span class="iname">Fear & Greed Index (alternative.me)</span>
+          <span class="ival">Score: 12/100 · Extreme Fear (contrarian alcista)</span>
+          <span class="isrc">Fear&Greed</span>
+          <span class="iw">×1</span>
+        </div>
+        <div class="det" id="det-aaii">Fear & Greed Index (alternative.me). <35 miedo extremo = contrarian alcista. >70 codicia extrema = precaución.</div>
+  </div>
+  <div class="lcard">
+    <div class="lhdr">
+      <span class="ltitle">Liquidez & política monetaria</span>
+      <span class="lbadge" style="background:#FCEBEB;color:#791F1F">Rojo</span>
+    </div>
+    
+        <div class="irow" onclick="tog('fed')">
+          <div class="dot" style="background:#A32D2D"></div>
+          <span class="iname">Fed sesgo</span>
+          <span class="ival">Warsh hawkish — posible subida 2026</span>
+          <span class="isrc">FRED</span>
+          <span class="iw">×2</span>
+        </div>
+        <div class="det" id="det-fed">Tendencia del tipo efectivo Fed Funds (FRED). Subiendo = restrictivo. Bajando = expansivo. Sin cambios = pausa.</div>
+        <div class="irow" onclick="tog('dxy')">
+          <div class="dot" style="background:#A32D2D"></div>
+          <span class="iname">DXY proxy (UUP)</span>
+          <span class="ival">UUP 1m: +2.6%</span>
+          <span class="isrc">Yahoo Finance</span>
+          <span class="iw">×1</span>
+        </div>
+        <div class="det" id="det-dxy">Proxy DXY via ETF UUP. Dólar fuerte presiona emergentes y beneficios de multinacionales americanas.</div>
+  </div></div>
+
+<div class="footer">
+  Fuentes: Yahoo Finance · FRED (St. Louis Fed) · Fear &amp; Greed Index (alternative.me) · 100% gratuito<br>
+  Haz clic en cada indicador para ver su interpretación · Orientativo, no constituye asesoramiento financiero<br>
+  Actualización automática cada sábado a las 07:00h UTC
+</div>
+
+<script>
+function tog(id){
+  const el=document.getElementById('det-'+id);
+  if(el) el.classList.toggle('open');
+}
+</script>
 </body>
 </html>
