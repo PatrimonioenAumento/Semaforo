@@ -137,7 +137,7 @@ for k, t in TICKERS.items():
 
 print("\nDescargando FRED...")
 F = {}
-for name, sid in [('HY','BAMLH0A0HYM2'), ('CURVE','T10Y2Y'), ('PMI','NAPM'), ('EFFR','EFFR'), ('UPPER','DFEDTARU')]:
+for name, sid in [('HY','BAMLH0A0HYM2'), ('CURVE','T10Y2Y'), ('PMI','GACDISA066MSFRBPHI'), ('EFFR','EFFR'), ('UPPER','DFEDTARU')]:
     F[name] = download_fred(sid)
     status = f"{len(F[name])} obs, último: {F[name].index[-1].strftime('%d %b %Y') if len(F[name])>0 else 'n/a'}"
     print(f"  {'✓' if len(F[name])>0 else '✗'} {sid}: {status}")
@@ -297,14 +297,15 @@ if m_tip is not None:
         'g' if m_tip > 0.5 else ('y' if m_tip > -0.5 else 'r'),
         f"TIP 13612U: {m_tip:+.2f}% (Keller HAA)", 2, 'YF', 'flujos')
 
-# 15. PMI (FRED)
+# 15. PMI proxy — Philly Fed Manufacturing Index (FRED, gratuito, correlaciona con ISM)
 pmi_df = F.get('PMI', pd.DataFrame())
 if len(pmi_df) > 0:
     pmi_v = float(pmi_df['value'].iloc[-1])
     pmi_d = pmi_df.index[-1].strftime('%b %Y')
-    add('pmi', 'ISM PMI manufacturero USA',
-        'g' if pmi_v > 52 else ('y' if pmi_v > 50 else 'r'),
-        f"ISM PMI: {pmi_v:.1f} ({pmi_d})", 2, 'FRED', 'macro')
+    # Escala Philly Fed: centrada en 0. >0 expansión, <0 contracción
+    add('pmi', 'Philly Fed Mfg Index (proxy PMI)',
+        'g' if pmi_v > 10 else ('y' if pmi_v > -5 else 'r'),
+        f"Philly Fed: {pmi_v:+.1f} ({pmi_d})", 2, 'FRED', 'macro')
 
 # 16. Curva 2Y-10Y (FRED)
 curve_df = F.get('CURVE', pd.DataFrame())
@@ -457,7 +458,7 @@ DETAILS = {
     'bnd':       'Canario de renta fija. BND cayendo con S&P subiendo = bonistas descuentan algo que acciones aún ignoran.',
     'coppergold':'Ratio cobre (crecimiento) vs oro (refugio). Uno de los mejores adelantados del ciclo macro a 3 meses.',
     'tip':       'Canario de Wouter Keller (HAA). Momentum 13612U del ETF TIP. Negativo = rotar todo a defensivos.',
-    'pmi':       'ISM PMI manufacturero USA (FRED). >52 expansión sólida, 50-52 frágil, <50 contracción. Adelanta el ciclo 2-3 meses.',
+    'pmi':       'Philly Fed Manufacturing Index (FRED, gratuito). Correlaciona fuertemente con el ISM PMI nacional. >10 expansión sólida, -5 a 10 transición, <-5 contracción.',
     'yieldcurve':'Spread 2Y-10Y de Treasuries. Inversión precede recesiones 6-18 meses. Desinvirtiéndose = señal positiva de transición.',
     'eps':       'Proxy de beneficios: aceleración del SPY vs su tendencia de 6 meses. Positiva = empresas sorprendiendo al alza.',
     'vix':       'Índice VIX: volatilidad implícita S&P 500. <18 favorable, 18-28 nerviosismo, >28 pánico (señal contraria alcista).',
