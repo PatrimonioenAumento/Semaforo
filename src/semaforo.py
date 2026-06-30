@@ -37,37 +37,38 @@ def download_yf(ticker, period='2y'):
         print(f"  ✗ YF {ticker}: {e}")
         return pd.Series(dtype=float)
 
-def download_fred(series_id):
-    """FRED via JSON API — más robusto que el CSV"""
-    try:
-        start = (datetime.now() - timedelta(days=365*5)).strftime('%Y-%m-%d')
-        url = f"https://fred.stlouisfed.org/graph/fredgraph.csv"
-        params = {'id': series_id}
-        r = requests.get(url, params=params, timeout=15,
-                        headers={'User-Agent': 'Mozilla/5.0'})
-        r.raise_for_status()
-        lines = r.text.strip().split('\n')
-        # Detectar cabecera
-        header = lines[0].split(',')
-        date_col = header[0].strip().strip('"')
-        val_col  = header[1].strip().strip('"')
-        rows = []
-        for line in lines[1:]:
-            parts = line.split(',')
-            if len(parts) >= 2:
-                try:
-                    d = pd.to_datetime(parts[0].strip().strip('"'))
-                    v = float(parts[1].strip().strip('"'))
-                    rows.append({'date': d, 'value': v})
-                except:
-                    pass
-        if not rows:
+def download_fred(series_id, max_retries=3):
+    """FRED via CSV endpoint, con reintentos y timeout ampliado"""
+    url = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+    params = {'id': series_id}
+    headers = {'User-Agent': 'Mozilla/5.0 (compatible; SemaforoBot/1.0)'}
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            r = requests.get(url, params=params, timeout=45, headers=headers)
+            r.raise_for_status()
+            lines = r.text.strip().split('\n')
+            rows = []
+            for line in lines[1:]:
+                parts = line.split(',')
+                if len(parts) >= 2:
+                    try:
+                        d = pd.to_datetime(parts[0].strip().strip('"'))
+                        v = float(parts[1].strip().strip('"'))
+                        rows.append({'date': d, 'value': v})
+                    except:
+                        pass
+            if not rows:
+                raise ValueError("Sin filas válidas")
+            df = pd.DataFrame(rows).set_index('date').sort_index()
+            return df
+        except Exception as e:
+            if attempt < max_retries:
+                print(f"  ⟳ FRED {series_id}: intento {attempt} falló ({e}), reintentando...")
+                continue
+            print(f"  ✗ FRED {series_id}: {e}")
             return pd.DataFrame()
-        df = pd.DataFrame(rows).set_index('date').sort_index()
-        return df
-    except Exception as e:
-        print(f"  ✗ FRED {series_id}: {e}")
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 def pct_n(s, n):
     if s is None or len(s) < n + 1:
@@ -136,16 +137,11 @@ for k, t in TICKERS.items():
 
 print("\nDescargando FRED...")
 F = {}
-for name, sid in [('HY','BAMLH0A0HYM2'), ('CURVE','T10Y2Y'), ('PMI','ISM/MAN_PMI'), ('EFFR','EFFR'), ('UPPER','DFEDTARU')]:
+for name, sid in [('HY','BAMLH0A0HYM2'), ('CURVE','T10Y2Y'), ('PMI','NAPM'), ('EFFR','EFFR'), ('UPPER','DFEDTARU')]:
     F[name] = download_fred(sid)
     status = f"{len(F[name])} obs, último: {F[name].index[-1].strftime('%d %b %Y') if len(F[name])>0 else 'n/a'}"
     print(f"  {'✓' if len(F[name])>0 else '✗'} {sid}: {status}")
 
-# PMI fallback
-if len(F.get('PMI', pd.DataFrame())) == 0:
-    F['PMI'] = download_fred('NAPM')
-    if len(F['PMI']) > 0:
-        print(f"  ✓ NAPM (fallback): {len(F['PMI'])} obs")
 
 print("\nDescargando Fear & Greed...")
 fg_score, fg_label = fetch_greed_fear()
